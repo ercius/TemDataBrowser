@@ -1,4 +1,4 @@
-"""A script to run the GUI. Mainly for debugging. """
+"""A script to run the GUI. Mainly for debugging """
 
 from TemDataBrowser import main
 
