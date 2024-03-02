@@ -10,7 +10,7 @@ jobs:
     steps:
         - uses: actions/checkout@v4
         - name: Set up Python
-          uses: actions/setup-python@v4
+          uses: actions/setup-python@v5
           with:
             python-version: "3.x"
         - name: Install pypa/build
@@ -29,12 +29,14 @@ jobs:
 
   publish-to-testpypi:
     name: Publish Python distribution to TestPyPI
+    if: startsWith(github.event.ref, 'refs/tags/') # only if tagged
+    
     needs:
     - build
     runs-on: ubuntu-latest
 
     environment:
-      name: testpypi
+      name: release
       url: https://test.pypi.org/p/TemDataBrowser
 
     permissions:
@@ -42,7 +44,7 @@ jobs:
 
     steps:
         - name: Download all the dists
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: python-package-distributions
             path: dist/
