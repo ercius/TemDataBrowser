@@ -8,8 +8,8 @@ authors = [{name = "Peter Ercius", email="percius@lbl.gov"}]
 description = "Graphical user interface to view transmission electron microscopy data."
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = ["numpy","pyqtgraph","ScopeFoundry>=1.4.2","ncempy","scipy","imageio>2.17"]
-version = "1.0.6"
+dependencies = ["numpy","pyqtgraph","ScopeFoundry>=1.5","ncempy","scipy","imageio>2.17"]
+version = "1.0.7"
 
 [project.scripts]
 TemDataBrowser = "TemDataBrowser:open_file"
