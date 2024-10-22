@@ -421,6 +421,8 @@ def main():
     
     app = DataBrowser(sys.argv)
     app.settings['browse_dir'] = Path.home()
+    app.ui.setWindowTitle("TemDataBrowser")
+    
     # Load views here
     # Last loaded is the first one tried
     app.load_view(TemMetadataView(app))
