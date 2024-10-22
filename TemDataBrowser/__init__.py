@@ -75,7 +75,7 @@ class TemView(DataBrowserView):
         to make a guess
         """
         ext = Path(fname).suffix.lower()
-        return ext in ['.dm3', '.dm4', '.mrc', '.ali', '.rec', '.emd', '.ser']
+        return ext in ['.dm3', '.dm4', '.mrc', '.ali', '.rec', '.emd', '.ser', '.img']
 
     def on_change_data_filename(self, fname):
         """  A new file has been selected by the user, load and display it
@@ -409,7 +409,7 @@ class TemMetadataView(DataBrowserView):
         
     def is_file_supported(self, fname):
         ext = Path(fname).suffix
-        return ext.lower() in ('.dm3', '.dm4', '.mrc', '.ali', '.rec', '.ser', '.emi')
+        return ext.lower() in ('.dm3', '.dm4', '.mrc', '.ali', '.rec', '.ser', '.emi', '.img')
 
 def open_file():
     """Start the graphical user interface from inside a python interpreter."""
