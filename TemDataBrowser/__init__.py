@@ -381,10 +381,18 @@ class TemMetadataView(DataBrowserView):
     @functools.lru_cache(maxsize=10, typed=False)
     def get_emi_metadata(fname):
         return ncempy.io.ser.read_emi(fname)
+    
+    @staticmethod
+    @functools.lru_cache(maxsize=10, typed=False)
+    def get_img_metadata(fname):
+        print(fname)
+        with ncempy.io.smv.fileSMV(fname) as f0:
+            md = f0.header_info
+        return md
         
     def on_change_data_filename(self, fname):
         ext = Path(fname).suffix
-        
+
         meta_data = {'file name': str(fname)}
         if ext in ('.dm3', '.dm4'):
             meta_data = self.get_dm_metadata(fname)
@@ -400,13 +408,15 @@ class TemMetadataView(DataBrowserView):
             meta_data = self.get_ser_metadata(fname)
         elif ext in ('.emi',):
             meta_data = self.get_emi_metadata(fname)
+        elif ext in ('.img',):
+            meta_data = self.get_img_metadata(fname)
             
         txt = f'file name = {fname}\n'
         for k, v in meta_data.items():
             line = f'{k} = {v}\n'
             txt += line
         self.ui.setText(txt)
-        
+    
     def is_file_supported(self, fname):
         ext = Path(fname).suffix
         return ext.lower() in ('.dm3', '.dm4', '.mrc', '.ali', '.rec', '.ser', '.emi', '.img')
