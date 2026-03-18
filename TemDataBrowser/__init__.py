@@ -81,14 +81,18 @@ class TemView(DataBrowserView):
         """  A new file has been selected by the user, load and display it
         """
         try:
+            is_stemtomo = False
+            print(f'Loading {fname}...')
             if Path(fname).suffix.lower() == '.emd':
                 # Check for special STEMTomo7 Berkeley EMD files
-                is_stemtomo = False
-                if Path(fname).suffix.lower() == '.emd':
+                try:
                     with ncempy.io.emd.fileEMD(fname) as f0:
                         if 'data' in f0.file_hdl:
                             if 'stemtomo version' in f0.file_hdl['data'].attrs:
                                 is_stemtomo = True
+                except ncempy.io.emd.NoEmdDataSets:
+                    # Velox files throw this error, they are not Berkeley EMD files
+                    is_stemtomo = False
             
             file = ncempy.read(fname)
             
@@ -227,7 +231,8 @@ class TemMetadataView(DataBrowserView):
         if hasattr(mrc1, 'FEIinfo'):
             # add in the special FEIinfo if it exists
             try:
-                metaData.update(mrc1.FEIinfo)
+                if isinstance(mrc1.FEIinfo, dict):
+                    metaData.update(mrc1.FEIinfo)
             except TypeError:
                 pass
 
@@ -310,12 +315,14 @@ class TemMetadataView(DataBrowserView):
         import json
         metaData = {}
         with ncempy.io.emdVelox.fileEMDVelox(path) as f0:
-            dataGroup = emd_obj.list_data[0]
+            if f0.list_data is None:
+                return metaData
+            dataGroup = f0.list_data[0]
             dataset0 = dataGroup['Data']
 
             # Convert JSON metadata to dict
-            mData = emd_obj.list_data[0]['Metadata'][:, 0]
-            validMetaDataIndex = npwhere(mData > 0)  # find valid metadata
+            mData = f0.list_data[0]['Metadata'][:, 0]
+            validMetaDataIndex = np.where(mData > 0)  # find valid metadata
             mData = mData[validMetaDataIndex].tostring()  # change to string
             mDataS = json.loads(mData.decode('utf-8', 'ignore'))  # load UTF-8 string as JSON and output dict
             metaData['pixel sizes'] = []
@@ -399,11 +406,17 @@ class TemMetadataView(DataBrowserView):
         elif ext in ('.mrc', '.rec', '.ali'):
             meta_data = self.get_mrc_metadata(fname)
         elif ext in ('.emd',):
-            with ncempy.io.emd.fileEMD(fname) as emd0:
-                if len(emd0.list_emds) > 0:
-                    meta_data = self.get_emd_metadata(fname)
-                else:
-                    meta_data = self.get_velox_metadata(fname)
+            try: 
+                # Parse the file to see if any EMD datasets exist
+                # if not then it throws a NoEmdDataSets error
+                with ncempy.io.emd.fileEMD(fname) as f0:
+                    meta_data = f0.getMetadata(0)
+            except ncempy.io.emd.NoEmdDataSets:
+                with ncempy.io.emdVelox.fileEMDVelox(fname) as f0:
+                    if f0.list_data is not None:
+                        meta_data = f0.getMetadata(0)
+                    else:
+                        meta_data = {'file name': str(fname), 'error': 'No EMD datasets found'}
         elif ext in ('.ser',):
             meta_data = self.get_ser_metadata(fname)
         elif ext in ('.emi',):
