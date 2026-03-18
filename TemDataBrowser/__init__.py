@@ -313,12 +313,12 @@ class TemMetadataView(DataBrowserView):
         import json
         metaData = {}
         with ncempy.io.emdVelox.fileEMDVelox(path) as f0:
-            dataGroup = emd_obj.list_data[0]
+            dataGroup = f0.list_data[0]
             dataset0 = dataGroup['Data']
 
             # Convert JSON metadata to dict
-            mData = emd_obj.list_data[0]['Metadata'][:, 0]
-            validMetaDataIndex = npwhere(mData > 0)  # find valid metadata
+            mData = f0.list_data[0]['Metadata'][:, 0]
+            validMetaDataIndex = np.where(mData > 0)  # find valid metadata
             mData = mData[validMetaDataIndex].tostring()  # change to string
             mDataS = json.loads(mData.decode('utf-8', 'ignore'))  # load UTF-8 string as JSON and output dict
             metaData['pixel sizes'] = []
