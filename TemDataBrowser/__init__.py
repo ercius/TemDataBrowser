@@ -179,7 +179,7 @@ class TemMetadataView(DataBrowserView):
         rawtltName = Path(path).with_suffix('.rawtlt')
         if rawtltName.exists():
             with open(rawtltName, 'r') as f1:
-                tilts = map(float, f1)
+                tilts = list(map(float, f1))
             meta_data['tilt angles'] = tilts
         
         # Read FEI parameters from .txt file if it exists
@@ -283,7 +283,7 @@ class TemMetadataView(DataBrowserView):
     
     def is_file_supported(self, fname):
         ext = Path(fname).suffix
-        return ext.lower() in ('.dm3', '.dm4', '.mrc', '.ali', '.rec', '.ser', '.emi', '.img')
+        return ext.lower() in ('.dm3', '.dm4', '.mrc', '.ali', '.rec', '.ser', '.emi', '.img', '.emd')
 
 def open_file():
     """Start the graphical user interface from inside a python interpreter."""
