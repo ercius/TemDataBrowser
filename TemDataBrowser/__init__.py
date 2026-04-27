@@ -1,7 +1,4 @@
-#from __future__ import division, print_function, absolute_import
-
 from pathlib import Path
-from collections import OrderedDict
 import functools
 
 from ScopeFoundry import BaseApp
@@ -10,8 +7,6 @@ from ScopeFoundry.data_browser import DataBrowser, DataBrowserView
 from qtpy import QtCore, QtWidgets, QtGui
 import pyqtgraph as pg
 import numpy as np
-from ScopeFoundry.logged_quantity import LQCollection
-import argparse
 
 import imageio.v3 as iio
 import ncempy
