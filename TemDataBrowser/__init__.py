@@ -219,15 +219,15 @@ class TemMetadataView(DataBrowserView):
     @functools.lru_cache(maxsize=10, typed=False)
     def get_ser_metadata(path):
         with ncempy.io.ser.fileSER(path) as f:
-            meta_data = f.getMetadata()
             # Returns global metadata for the whole file
-            # Per-image pixel size comes from getDataset(), not here
+            meta_data = f.getMetadata()
             
-            with ncempy.io.ser.fileSER(path) as ser1:
-                _, extra_metadata = ser1.getDataset(0)  # have to get 1 image and its meta data
-                meta_data.update(extra_metadata)
+            # Get additional metadata from the first dataset
+            _, extra_metadata = f.getDataset(0)
+            meta_data.update(extra_metadata)
 
-                meta_data.update(ser1.head)  # some header data for the ser file
+            # Get the header information
+            meta_data.update(f.head)
 
             # Clean the dictionary
             for k, v in meta_data.items():
