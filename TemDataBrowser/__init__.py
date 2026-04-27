@@ -206,8 +206,9 @@ class TemMetadataView(DataBrowserView):
     def get_velox_metadata(path):
         """ Reads important metadata from Velox EMD files."""
         with ncempy.io.emdVelox.fileEMDVelox(path) as f:
+            if f.list_data is None:
+                return None
             meta_data = f.getMetadata(0)  # 0 = index into f.list_data
-
         return meta_data
 
     @staticmethod
@@ -244,7 +245,7 @@ class TemMetadataView(DataBrowserView):
         return meta_data
 
     def on_change_data_filename(self, fname):
-        ext = Path(fname).suffix
+        ext = Path(fname).suffix.lower()
 
         meta_data = {'file name': str(fname)}
         if ext in ('.dm3', '.dm4'):
@@ -252,17 +253,14 @@ class TemMetadataView(DataBrowserView):
         elif ext in ('.mrc', '.rec', '.ali'):
             meta_data = self.get_mrc_metadata(fname)
         elif ext in ('.emd',):
-            try: 
-                # Parse the file to see if any EMD datasets exist
-                # if not then it throws a NoEmdDataSets error
-                with ncempy.io.emd.fileEMD(fname) as f0:
-                    meta_data = f0.getMetadata(0)
+            try:
+                meta_data = self.get_emd_metadata(fname)
             except ncempy.io.emd.NoEmdDataSets:
-                with ncempy.io.emdVelox.fileEMDVelox(fname) as f0:
-                    if f0.list_data is not None:
-                        meta_data = f0.getMetadata(0)
-                    else:
-                        meta_data = {'file name': str(fname), 'error': 'No EMD datasets found'}
+                velox_meta = self.get_velox_metadata(fname)
+                if velox_meta is not None:
+                    meta_data = velox_meta
+                else:
+                    meta_data = {'file name': str(fname), 'error': 'No EMD datasets found'}
         elif ext in ('.ser',):
             meta_data = self.get_ser_metadata(fname)
         elif ext in ('.emi',):
