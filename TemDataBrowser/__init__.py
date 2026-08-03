@@ -1,7 +1,7 @@
-#from __future__ import division, print_function, absolute_import
-
+from importlib.metadata import version
 from pathlib import Path
-from collections import OrderedDict
+
+__version__ = version("TemDataBrowser")
 import functools
 
 from ScopeFoundry import BaseApp
@@ -10,8 +10,6 @@ from ScopeFoundry.data_browser import DataBrowser, DataBrowserView
 from qtpy import QtCore, QtWidgets, QtGui
 import pyqtgraph as pg
 import numpy as np
-from ScopeFoundry.logged_quantity import LQCollection
-import argparse
 
 import imageio.v3 as iio
 import ncempy
@@ -163,106 +161,26 @@ class TemMetadataView(DataBrowserView):
     @functools.lru_cache(maxsize=10, typed=False)
     def get_dm_metadata(fname):
         """ Reads important metadata from DM files"""
-        metaData = {}
-        with ncempy.io.dm.fileDM(fname, on_memory=True) as dm1:
-            # Only keep the most useful tags as meta data
-            for kk, ii in dm1.allTags.items():
-                # Most useful starting tags
-                prefix1 = 'ImageList.{}.ImageTags.'.format(dm1.numObjects)
-                prefix2 = 'ImageList.{}.ImageData.'.format(dm1.numObjects)
-                pos1 = kk.find(prefix1)
-                pos2 = kk.find(prefix2)
-                if pos1 > -1:
-                    sub = kk[pos1 + len(prefix1):]
-                    metaData[sub] = ii
-                elif pos2 > -1:
-                    sub = kk[pos2 + len(prefix2):]
-                    metaData[sub] = ii
+        with ncempy.io.dm.fileDM(fname) as f:
+            meta_data = f.getMetadata(index=0)
 
-                # Remove unneeded keys
-                for jj in list(metaData):
-                    if jj.find('frame sequence') > -1:
-                        del metaData[jj]
-                    elif jj.find('Private') > -1:
-                        del metaData[jj]
-                    elif jj.find('Reference Images') > -1:
-                        del metaData[jj]
-                    elif jj.find('Frame.Intensity') > -1:
-                        del metaData[jj]
-                    elif jj.find('Area.Transform') > -1:
-                        del metaData[jj]
-                    elif jj.find('Parameters.Objects') > -1:
-                        del metaData[jj]
-                    elif jj.find('Device.Parameters') > -1:
-                        del metaData[jj]
-
-            # Store the X and Y pixel size, offset and unit
-            try:
-                metaData['PhysicalSizeX'] = metaData['Calibrations.Dimension.1.Scale']
-                metaData['PhysicalSizeXOrigin'] = metaData['Calibrations.Dimension.1.Origin']
-                metaData['PhysicalSizeXUnit'] = metaData['Calibrations.Dimension.1.Units']
-                metaData['PhysicalSizeY'] = metaData['Calibrations.Dimension.2.Scale']
-                metaData['PhysicalSizeYOrigin'] = metaData['Calibrations.Dimension.2.Origin']
-                metaData['PhysicalSizeYUnit'] = metaData['Calibrations.Dimension.2.Units']
-            except:
-                metaData['PhysicalSizeX'] = 1
-                metaData['PhysicalSizeXOrigin'] = 0
-                metaData['PhysicalSizeXUnit'] = ''
-                metaData['PhysicalSizeY'] = 1
-                metaData['PhysicalSizeYOrigin'] = 0
-                metaData['PhysicalSizeYUnit'] = ''
-
-        return metaData
+        return meta_data
     
     @staticmethod
     @functools.lru_cache(maxsize=10, typed=False)
     def get_mrc_metadata(path):
         """ Reads important metadata from MRC and related files."""
-        metaData = {}
+        with ncempy.io.mrc.fileMRC(path) as f:
+            meta_data = f.getMetadata()
 
-        # Open file and parse the header
-        with ncempy.io.mrc.fileMRC(path) as mrc1:
-            pass
-
-        # Save most useful metaData
-        metaData['axisOrientations'] = mrc1.axisOrientations  # meta data information from the mrc header
-        metaData['cellAngles'] = mrc1.cellAngles
-
-        if hasattr(mrc1, 'FEIinfo'):
-            # add in the special FEIinfo if it exists
-            try:
-                if isinstance(mrc1.FEIinfo, dict):
-                    metaData.update(mrc1.FEIinfo)
-            except TypeError:
-                pass
-
-        # Store the X and Y pixel size, offset and unit
-        # Test for bad pixel sizes which happens often
-        if mrc1.voxelSize[2] > 0:
-            metaData['PhysicalSizeX'] = mrc1.voxelSize[2] * 1e-10  # change Angstroms to meters
-            metaData['PhysicalSizeXOrigin'] = 0
-            metaData['PhysicalSizeXUnit'] = 'm'
-        else:
-            metaData['PhysicalSizeX'] = 1
-            metaData['PhysicalSizeXOrigin'] = 0
-            metaData['PhysicalSizeXUnit'] = ''
-        if mrc1.voxelSize[1] > 0:
-            metaData['PhysicalSizeY'] = mrc1.voxelSize[1] * 1e-10  # change Angstroms to meters
-            metaData['PhysicalSizeYOrigin'] = 0
-            metaData['PhysicalSizeYUnit'] = 'm'
-        else:
-            metaData['PhysicalSizeY'] = 1
-            metaData['PhysicalSizeYOrigin'] = 0
-            metaData['PhysicalSizeYUnit'] = ''
-
-        metaData['FileName'] = path
-
+        # Read tilt angles from .rawtlt file if it exists
         rawtltName = Path(path).with_suffix('.rawtlt')
         if rawtltName.exists():
             with open(rawtltName, 'r') as f1:
-                tilts = map(float, f1)
-            metaData['tilt angles'] = tilts
-
+                tilts = list(map(float, f1))
+            meta_data['tilt angles'] = tilts
+        
+        # Read FEI parameters from .txt file if it exists
         FEIparameters = Path(path).with_suffix('.txt')
         if FEIparameters.exists():
             with open(FEIparameters, 'r') as f2:
@@ -274,116 +192,49 @@ class TemMetadataView(DataBrowserView):
                     pp2[ll[0]] = float(ll[1])
                 except:
                     pass  # skip lines with no data
-            metaData.update(pp2)
+            meta_data.update(pp2)
 
-        return metaData
+        return meta_data
     
     @staticmethod
     @functools.lru_cache(maxsize=10, typed=False)
     def get_emd_metadata(path):
         """ Reads important metadata from EMD Berkeley files."""
-        metaData = {}
-        with ncempy.io.emd.fileEMD(path) as emd0:        
-            try:
-                metaData.update(emd0.user.attrs)
-            except AttributeError:
-                pass
-            try:
-                metaData.update(emd0.microscope.attrs)
-            except AttributeError:
-                pass
-            try:
-                metaData.update(emd0.sample.attrs)
-            except AttributeError:
-                pass
-            dims = emd0.get_emddims(emd0.list_emds[0])
-            dimX = dims[-1]
-            dimY = dims[-2]
-            metaData['PhysicalSizeX'] = dimX[0][1] - dimX[0][0]
-            metaData['PhysicalSizeXOrigin'] = dimX[0][0]
-            metaData['PhysicalSizeXUnit'] = dimX[2].replace('_', '')
-            metaData['PhysicalSizeY'] = dimY[0][1] - dimY[0][0]
-            metaData['PhysicalSizeYOrigin'] = dimY[0][0]
-            metaData['PhysicalSizeYUnit'] = dimY[2].replace('_', '')
-        return metaData
-
+        with ncempy.io.emd.fileEMD(path) as f:
+            meta_data = f.getMetadata(0)  # 0 = index into f.list_data
+        return meta_data
 
     @staticmethod
     @functools.lru_cache(maxsize=10, typed=False)
     def get_velox_metadata(path):
         """ Reads important metadata from Velox EMD files."""
-        import json
-        metaData = {}
-        with ncempy.io.emdVelox.fileEMDVelox(path) as f0:
-            if f0.list_data is None:
-                return metaData
-            dataGroup = f0.list_data[0]
-            dataset0 = dataGroup['Data']
+        with ncempy.io.emdVelox.fileEMDVelox(path) as f:
+            if f.list_data is None:
+                return None
+            meta_data = f.getMetadata(0)  # 0 = index into f.list_data
+        return meta_data
 
-            # Convert JSON metadata to dict
-            mData = f0.list_data[0]['Metadata'][:, 0]
-            validMetaDataIndex = np.where(mData > 0)  # find valid metadata
-            mData = mData[validMetaDataIndex].tostring()  # change to string
-            mDataS = json.loads(mData.decode('utf-8', 'ignore'))  # load UTF-8 string as JSON and output dict
-            metaData['pixel sizes'] = []
-            metaData['pixel units'] = []
-            try:
-                # Store the X and Y pixel size, offset and unit
-                metaData['PhysicalSizeX'] = float(mDataS['BinaryResult']['PixelSize']['width'])
-                metaData['PhysicalSizeXOrigin'] = float(mDataS['BinaryResult']['Offset']['x'])
-                metaData['PhysicalSizeXUnit'] = mDataS['BinaryResult']['PixelUnitX']
-                metaData['PhysicalSizeY'] = float(mDataS['BinaryResult']['PixelSize']['height'])
-                metaData['PhysicalSizeYOrigin'] = float(mDataS['BinaryResult']['Offset']['y'])
-                metaData['PhysicalSizeYUnit'] = mDataS['BinaryResult']['PixelUnitY']
-            except:
-                metaData['PhysicalSizeX'] = 1
-                metaData['PhysicalSizeXOrigin'] = 0
-                metaData['PhysicalSizeXUnit'] = ''
-                metaData['PhysicalSizeY'] = 1
-                metaData['PhysicalSizeYOrigin'] = 0
-                metaData['PhysicalSizeYUnit'] = ''
-
-            metaData.update(mDataS)
-
-            metaData['shape'] = dataset0.shape
-        return metaData
-    
     @staticmethod
     @functools.lru_cache(maxsize=10, typed=False)
-    def get_ser_metadata(fname):
-            metaData = {}
-            with ncempy.io.ser.fileSER(fname) as ser1:
-                data, metaData = ser1.getDataset(0)  # have to get 1 image and its meta data
+    def get_ser_metadata(path):
+        with ncempy.io.ser.fileSER(path) as f:
+            # Returns global metadata for the whole file
+            meta_data = f.getMetadata()
+            
+            # Get additional metadata from the first dataset
+            _, extra_metadata = f.getDataset(0)
+            meta_data.update(extra_metadata)
 
-                # Add extra meta data from the EMI file if it exists
-                if ser1._emi is not None:
-                    metaData.update(ser1._emi)
-
-            metaData.update(ser1.head)  # some header data for the ser file
+            # Get the header information
+            meta_data.update(f.head)
 
             # Clean the dictionary
-            for k, v in metaData.items():
+            for k, v in meta_data.items():
                 if isinstance(v, bytes):
-                    metaData[k] = v.decode('UTF8')
+                    meta_data[k] = v.decode('UTF8')
 
-            # Store the X and Y pixel size, offset and unit
-            try:
-                metaData['PhysicalSizeX'] = metaData['Calibration'][0]['CalibrationDelta']
-                metaData['PhysicalSizeXOrigin'] = metaData['Calibration'][0]['CalibrationOffset']
-                metaData['PhysicalSizeXUnit'] = 'm'  # always meters
-                metaData['PhysicalSizeY'] = metaData['Calibration'][1]['CalibrationDelta']
-                metaData['PhysicalSizeYOrigin'] = metaData['Calibration'][1]['CalibrationOffset']
-                metaData['PhysicalSizeYUnit'] = 'm'  # always meters
-            except:
-                metaData['PhysicalSizeX'] = 1
-                metaData['PhysicalSizeXOrigin'] = 0
-                metaData['PhysicalSizeXUnit'] = ''
-                metaData['PhysicalSizeY'] = 1
-                metaData['PhysicalSizeYOrigin'] = 0
-                metaData['PhysicalSizeYUnit'] = ''
+            return meta_data
 
-            return metaData
-    
     @staticmethod
     @functools.lru_cache(maxsize=10, typed=False)
     def get_emi_metadata(fname):
@@ -392,13 +243,12 @@ class TemMetadataView(DataBrowserView):
     @staticmethod
     @functools.lru_cache(maxsize=10, typed=False)
     def get_img_metadata(fname):
-        print(fname)
         with ncempy.io.smv.fileSMV(fname) as f0:
-            md = f0.header_info
-        return md
-        
+            meta_data = f0.getMetadata()
+        return meta_data
+
     def on_change_data_filename(self, fname):
-        ext = Path(fname).suffix
+        ext = Path(fname).suffix.lower()
 
         meta_data = {'file name': str(fname)}
         if ext in ('.dm3', '.dm4'):
@@ -406,17 +256,14 @@ class TemMetadataView(DataBrowserView):
         elif ext in ('.mrc', '.rec', '.ali'):
             meta_data = self.get_mrc_metadata(fname)
         elif ext in ('.emd',):
-            try: 
-                # Parse the file to see if any EMD datasets exist
-                # if not then it throws a NoEmdDataSets error
-                with ncempy.io.emd.fileEMD(fname) as f0:
-                    meta_data = f0.getMetadata(0)
+            try:
+                meta_data = self.get_emd_metadata(fname)
             except ncempy.io.emd.NoEmdDataSets:
-                with ncempy.io.emdVelox.fileEMDVelox(fname) as f0:
-                    if f0.list_data is not None:
-                        meta_data = f0.getMetadata(0)
-                    else:
-                        meta_data = {'file name': str(fname), 'error': 'No EMD datasets found'}
+                velox_meta = self.get_velox_metadata(fname)
+                if velox_meta is not None:
+                    meta_data = velox_meta
+                else:
+                    meta_data = {'file name': str(fname), 'error': 'No EMD datasets found'}
         elif ext in ('.ser',):
             meta_data = self.get_ser_metadata(fname)
         elif ext in ('.emi',):
@@ -432,7 +279,7 @@ class TemMetadataView(DataBrowserView):
     
     def is_file_supported(self, fname):
         ext = Path(fname).suffix
-        return ext.lower() in ('.dm3', '.dm4', '.mrc', '.ali', '.rec', '.ser', '.emi', '.img')
+        return ext.lower() in ('.dm3', '.dm4', '.mrc', '.ali', '.rec', '.ser', '.emi', '.img', '.emd')
 
 def open_file():
     """Start the graphical user interface from inside a python interpreter."""

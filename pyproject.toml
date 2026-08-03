@@ -9,7 +9,7 @@ description = "Graphical user interface to view transmission electron microscopy
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy","pyqtgraph","ScopeFoundry>=1.5","ncempy>=1.15","scipy","imageio>2.17"]
-version = "1.1"
+version = "1.2"
 
 [project.scripts]
 TemDataBrowser = "TemDataBrowser:open_file"
