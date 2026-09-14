@@ -8,8 +8,25 @@ authors = [{name = "Peter Ercius", email="percius@lbl.gov"}]
 description = "Graphical user interface to view transmission electron microscopy data."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy","pyqtgraph","ScopeFoundry>=1.5","ncempy>=1.15","scipy","imageio>2.17"]
-version = "1.2"
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = ["numpy","pyqtgraph","qtpy","ScopeFoundry>=1.5","ncempy>=1.15","scipy","imageio>2.17"]
+dynamic = ["version"]
+
+[tool.setuptools_scm]
+
+[project.urls]
+Repository = "https://github.com/ercius/TemDataBrowser"
+Homepage = "https://github.com/ercius/TemDataBrowser"
 
 [project.scripts]
 TemDataBrowser = "TemDataBrowser:open_file"

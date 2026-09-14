@@ -3,6 +3,8 @@ from pathlib import Path
 
 __version__ = version("TemDataBrowser")
 import functools
+import json
+import re
 
 from ScopeFoundry import BaseApp
 from ScopeFoundry.helper_funcs import load_qt_ui_from_pkg
@@ -16,6 +18,91 @@ import ncempy
 
 # Use row-major instead of col-major
 pg.setConfigOption('imageAxisOrder', 'row-major')
+
+# Every line of the FEI tomography-parameter log is prefixed with a fixed-width
+# "MM/DD/YY HH:MM:SS " timestamp; what follows it is indented to show which section a
+# parameter belongs to.
+_TIMESTAMP_RE = re.compile(r'^\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} ')
+_VALUE_KEY = '_value'
+
+
+def _parse_fei_value(raw):
+    raw = raw.strip()
+    if raw == '':
+        return None
+    if raw in ('Yes', 'ON'):
+        return True
+    if raw in ('No', 'OFF'):
+        return False
+    try:
+        return float(raw)
+    except ValueError:
+        return raw
+
+
+def _parse_fei_parameters(lines):
+    """Parse the vendor tomography-parameter log into a nested dict.
+
+    Section headers (e.g. "STEM imaging mode", "Check Focus") repeat parameter names
+    like "Periodicity (high tilt range)" under different settings, so a flat dict would
+    have later sections silently overwrite earlier ones. Indentation depth tells sections
+    apart from their children, so it is used to nest rather than flatten them.
+
+    A line can be a leaf, a header with no value of its own ("STEM imaging mode"), or
+    both at once ("Check Focus: Yes" has its own value and also has Periodicity settings
+    indented beneath it) -- every line is therefore pushed as a potential parent, and
+    _collapse resolves what it actually turned out to be once all its children are known.
+    """
+    root = {}
+    stack = [(-1, root)]
+    for raw_line in lines:
+        line = _TIMESTAMP_RE.sub('', raw_line)
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # The stack must unwind to this line's depth before deciding whether to skip it,
+        # or a skipped section header (e.g. a "-----" rule right after a depth-1 line)
+        # would leave a stale frame on the stack and misparent everything that follows.
+        depth = len(line) - len(line.lstrip(' '))
+        while stack[-1][0] >= depth:
+            stack.pop()
+
+        if set(stripped) == {'-'}:
+            continue  # decorative rule; never has children of its own
+        parent = stack[-1][1]
+
+        if ':' in stripped:
+            key, _, value = stripped.partition(':')
+            key, value = key.strip(), _parse_fei_value(value)
+        else:
+            key, value = stripped, None
+
+        node = {_VALUE_KEY: value}
+        parent[key] = node
+        stack.append((depth, node))
+
+    _collapse(root)
+    return root
+
+
+def _collapse(node):
+    """Resolve each {_value, ...children} node into its final shape.
+
+    No children and no value -> True (a bare flag like "STEM imaging mode" turned out
+    to introduce no sub-parameters). No children, a value -> that value. Children and no
+    value -> a dict of just the children. Both -> a dict of the children plus 'value'.
+    """
+    for key, child in node.items():
+        value = child.pop(_VALUE_KEY)
+        _collapse(child)
+        if not child:
+            node[key] = value if value is not None else True
+        elif value is not None:
+            child['value'] = value
+            node[key] = child
+        else:
+            node[key] = child
 
 class imageioView(DataBrowserView):
     """ Handles most normal image types like TIF, PNG, etc."""
@@ -183,16 +270,13 @@ class TemMetadataView(DataBrowserView):
         # Read FEI parameters from .txt file if it exists
         FEIparameters = Path(path).with_suffix('.txt')
         if FEIparameters.exists():
-            with open(FEIparameters, 'r') as f2:
-                lines = f2.readlines()
-            pp1 = list([ii[18:].strip().split(':')] for ii in lines[3:-1])
-            pp2 = {}
-            for ll in pp1:
-                try:
-                    pp2[ll[0]] = float(ll[1])
-                except:
-                    pass  # skip lines with no data
-            meta_data.update(pp2)
+            try:
+                with open(FEIparameters, 'r', encoding='utf-8-sig') as f2:
+                    lines = f2.readlines()
+            except UnicodeDecodeError:
+                with open(FEIparameters, 'r', encoding='cp1252') as f2:
+                    lines = f2.readlines()
+            meta_data['fei_parameters'] = _parse_fei_parameters(lines)
 
         return meta_data
     
@@ -273,6 +357,8 @@ class TemMetadataView(DataBrowserView):
             
         txt = f'file name = {fname}\n'
         for k, v in meta_data.items():
+            if isinstance(v, dict):
+                v = json.dumps(v, indent=2, default=str)
             line = f'{k} = {v}\n'
             txt += line
         self.ui.setText(txt)
