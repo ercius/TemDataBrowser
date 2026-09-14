@@ -6,7 +6,7 @@ A graphical user interface based on ScopeFoundry for viewing TEM data.
 # Installation
 First install QT bindings. For example:
 
-`$ pip install PyQt5`
+`$ pip install PyQt6`
 
 Then install this package and the rest of the dependencies:
 
