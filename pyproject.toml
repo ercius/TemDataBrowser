@@ -22,6 +22,9 @@ classifiers = [
 dependencies = ["numpy","pyqtgraph","qtpy","ScopeFoundry>=1.5","ncempy>=1.15","scipy","imageio>2.17"]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+mcp = ["fastmcp>=2.12.2"]
+
 [tool.setuptools_scm]
 
 [project.urls]
