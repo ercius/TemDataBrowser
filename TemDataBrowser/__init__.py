@@ -384,6 +384,10 @@ def main():
     app.load_view(TemMetadataView(app))
     app.load_view(imageioView(app))
     app.load_view(TemView(app))
+
+    from .fft_plugin import FFTPlugIn
+    app.add_plugin(FFTPlugIn(app))
+
     sys.exit(app.exec_())
     
 
