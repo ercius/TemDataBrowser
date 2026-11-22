@@ -865,6 +865,14 @@ class MCPServerPlugIn(DataBrowserPlugIn):
     def is_running(self) -> bool:
         return bool(self.mcp_thread is not None and self.mcp_thread.isRunning())
 
+    def get_show_hide_button(self) -> QtWidgets.QPushButton:
+        """Return the toggle button with native Qt styling matching sibling toolbar buttons."""
+        self.show_button.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Fixed,
+        )
+        return self.show_button
+
     def setup(self) -> None:
         """Build the collapsible MCP server control panel."""
         self.ui = QtWidgets.QGroupBox("MCP Server")
